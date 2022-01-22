@@ -1,66 +1,42 @@
-extern crate ws;
+use crate::utils;
 use std::io::prelude::*;
-
 use std::time::{SystemTime, UNIX_EPOCH};
-// "drone.alkama.com:9000/livecode/radio"
+use tungstenite::connect;
 
-use ws::connect;
-use ws::util::Token;
-use ws::{Error, Handler, Handshake, Message, Result};
+// "drone.alkama.com:9000/livecode/radio"
 /// Recorder for bonzomatic network websocket instance
 
-fn format_name(room: &String, handle: &String, ts: &u128) -> String {
-    format!("{}_{}_{}", room, handle, ts)
-}
-
-pub struct Client {
-    handle: String,
-    out_file: std::fs::File,
-    cpt: i32,
-}
-impl Client {
-    pub fn init(protocol: &String, host: &String, room: &String, handle: &String) {
-        // Get useful data and formated data
-        let ts = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let basename_id = format_name(&room, &handle, &ts);
-
-        // Prepare file
-        let filename = &format!("{basename_id}.json");
-        let path = std::path::Path::new(filename);
-        let file = &std::fs::File::create(&path).expect("Error creating file");
-
-        // Connect to websocket
-        let url = format!("{protocol}://{host}/{room}/{handle}");
-        println!("Connection to {}", url);
-        connect(url, move |_| Client {
-            handle: basename_id.clone(),
-            out_file: file.try_clone().expect("Error Coling File"),
-            cpt: 0,
-        })
+pub fn record(protocol: &String, host: &String, room: &String, handle: &String) {
+    // Get useful data and formated data
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
         .unwrap()
+        .as_millis();
+    let basename_id = utils::get_file_basename(&room, &handle, &ts);
+
+    // Prepare file
+    let filename = &format!("{basename_id}.json");
+    let path = std::path::Path::new(filename);
+    let mut file = &std::fs::File::create(&path).expect("Error creating file");
+
+    //WS Connect, as listener / client only
+    let url = utils::get_ws_url(protocol, host, room, handle);
+    let (mut socket, response) = connect(&url).expect("Can't connect");
+
+    println!("Connected to the server");
+    println!("Response HTTP code: {}", response.status());
+    println!("Response contains the following headers:");
+    for (ref header, _value) in response.headers() {
+        println!("* {}", header);
     }
-}
-impl Handler for Client {
-    fn on_open(&mut self, _: Handshake) -> Result<()> {
-        println!("Connection Open");
-        Ok(())
-    }
-    fn on_message(&mut self, msg: Message) -> Result<()> {
-        self.cpt += 1;
-        let handle = &self.handle;
-        let cpt = &self.cpt;
-        println!("{handle}:{cpt}");
-        let txt = msg.as_text().expect("Erorr");
-        writeln!(self.out_file, "{txt}").expect("Error writing Json to zip");
-        Ok(())
-    }
-    fn on_error(&mut self, err: Error) {
-        eprintln!("Error {err}")
-    }
-    fn on_timeout(&mut self, _: Token) -> Result<()> {
-        Ok(eprintln!("Timeout"))
+    let mut i: u128 = 0;
+    loop {
+        let msg = socket.read_message().expect("Error reading message");
+        // One json per line
+        // Can't really serde, as bonzomatic sends a final `\0` that most of parser will consider as error
+        let msg = msg.into_text().expect("ser").replace("\n", "");
+        println!("{basename_id}:{i}");
+        writeln!(file, "{msg}").expect("Error writing Json to zip");
+        i = i + 1
     }
 }

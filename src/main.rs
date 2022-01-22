@@ -1,7 +1,7 @@
 pub mod recorder;
 pub mod replayer;
+mod utils;
 use clap::{AppSettings, Parser, Subcommand};
-use recorder::Client;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -62,7 +62,8 @@ fn main() {
             room,
             handle,
         } => {
-            Client::init(protocol, host, room, handle);
+            println!("Start Recorder");
+            recorder::record(protocol, host, room, handle);
             println!("End Recorder")
         }
         Commands::Replayer {
