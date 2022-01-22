@@ -1,9 +1,10 @@
 pub mod recorder;
+pub mod replayer;
 use clap::{AppSettings, Parser, Subcommand};
 use recorder::Client;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
 #[derive(Parser)]
 #[clap(author, version, about)]
 #[clap(global_setting(AppSettings::PropagateVersion))]
@@ -31,6 +32,25 @@ enum Commands {
         /// Handles
         handle: String,
     },
+    Replayer {
+        /// Protocol
+        #[clap( short, long, default_value_t = String::from("ws"))]
+        protocol: String,
+
+        /// Host or Host:Port
+        #[clap(long)]
+        host: String,
+
+        /// Room
+        #[clap(long)]
+        room: String,
+
+        /// Handles
+        handle: String,
+
+        /// Input Json file
+        file: String,
+    },
 }
 
 fn main() {
@@ -42,15 +62,19 @@ fn main() {
             room,
             handle,
         } => {
-            let running = Arc::new(AtomicBool::new(true));
-            let r = running.clone();
-            ctrlc::set_handler(move || {
-                r.store(false, Ordering::SeqCst);
-            })
-            .expect("Error setting Ctrl-C handler");
-
-            Client::init(protocol, host, room, handle, running.clone());
-            println!("End")
+            Client::init(protocol, host, room, handle);
+            println!("End Recorder")
+        }
+        Commands::Replayer {
+            protocol,
+            host,
+            room,
+            handle,
+            file,
+        } => {
+            println!("{file}");
+            replayer::replay(protocol, host, room, handle, file);
+            println!("End Replayer")
         }
     }
 }

@@ -1,14 +1,12 @@
 extern crate ws;
 use std::io::prelude::*;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 // "drone.alkama.com:9000/livecode/radio"
 
 use ws::connect;
 use ws::util::Token;
-use ws::{CloseCode, Error, Handler, Handshake, Message, Result, Sender};
+use ws::{Error, Handler, Handshake, Message, Result};
 /// Recorder for bonzomatic network websocket instance
 
 fn format_name(room: &String, handle: &String, ts: &u128) -> String {
@@ -17,19 +15,11 @@ fn format_name(room: &String, handle: &String, ts: &u128) -> String {
 
 pub struct Client {
     handle: String,
-    sender: Sender,
     out_file: std::fs::File,
     cpt: i32,
-    running: Arc<AtomicBool>,
 }
 impl Client {
-    pub fn init(
-        protocol: &String,
-        host: &String,
-        room: &String,
-        handle: &String,
-        running: Arc<AtomicBool>,
-    ) {
+    pub fn init(protocol: &String, host: &String, room: &String, handle: &String) {
         // Get useful data and formated data
         let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -38,19 +28,17 @@ impl Client {
         let basename_id = format_name(&room, &handle, &ts);
 
         // Prepare file
-        let filename = &format!("{}.json", basename_id);
+        let filename = &format!("{basename_id}.json");
         let path = std::path::Path::new(filename);
         let file = &std::fs::File::create(&path).expect("Error creating file");
 
         // Connect to websocket
-        let url = format!("{}://{}/{}/{}", protocol, host, room, handle);
+        let url = format!("{protocol}://{host}/{room}/{handle}");
         println!("Connection to {}", url);
-        connect(url, move |sender| Client {
+        connect(url, move |_| Client {
             handle: basename_id.clone(),
-            sender: sender,
             out_file: file.try_clone().expect("Error Coling File"),
             cpt: 0,
-            running: running.clone(),
         })
         .unwrap()
     }
@@ -62,18 +50,15 @@ impl Handler for Client {
     }
     fn on_message(&mut self, msg: Message) -> Result<()> {
         self.cpt += 1;
-
-        if self.running.load(Ordering::SeqCst) {
-            println!("{}:{}", self.handle, self.cpt);
-            writeln!(self.out_file, "{}", msg).expect("Error writing Json to zip");
-            Ok(())
-        } else {
-            println!("Stop signal received, closing stream");
-            self.sender.close(CloseCode::Normal)
-        }
+        let handle = &self.handle;
+        let cpt = &self.cpt;
+        println!("{handle}:{cpt}");
+        let txt = indoc! { msg.as_text().expect("Erorr")};
+        writeln!(self.out_file, "{txt}").expect("Error writing Json to zip");
+        Ok(())
     }
     fn on_error(&mut self, err: Error) {
-        eprintln!("Error {}", err)
+        eprintln!("Error {err}")
     }
     fn on_timeout(&mut self, _: Token) -> Result<()> {
         Ok(eprintln!("Timeout"))
