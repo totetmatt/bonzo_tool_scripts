@@ -53,7 +53,7 @@ impl Handler for Client {
         let handle = &self.handle;
         let cpt = &self.cpt;
         println!("{handle}:{cpt}");
-        let txt = indoc! { msg.as_text().expect("Erorr")};
+        let txt = msg.as_text().expect("Erorr");
         writeln!(self.out_file, "{txt}").expect("Error writing Json to zip");
         Ok(())
     }
