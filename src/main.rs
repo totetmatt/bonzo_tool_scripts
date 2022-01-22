@@ -3,8 +3,6 @@ pub mod replayer;
 mod utils;
 use clap::{AppSettings, Parser, Subcommand};
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 #[derive(Parser)]
 #[clap(author, version, about)]
 #[clap(global_setting(AppSettings::PropagateVersion))]
