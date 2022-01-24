@@ -1,5 +1,6 @@
 pub mod recorder;
 pub mod replayer;
+pub mod bonzomatic;
 mod utils;
 use clap::{AppSettings, Parser, Subcommand};
 
@@ -53,6 +54,7 @@ enum Commands {
 
 fn main() {
     let cli = Bts::parse();
+   
     match &cli.command {
         Commands::Recorder {
             protocol,

@@ -1,4 +1,5 @@
 use crate::utils;
+use crate::bonzomatic;
 use std::io::prelude::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tungstenite::connect;
@@ -34,9 +35,17 @@ pub fn record(protocol: &str, host: &str, room: &str, handle: &str) {
         let msg = socket.read_message().expect("Error reading message");
         // One json per line
         // Can't really serde, as bonzomatic sends a final `\0` that most of parser will consider as error
-        let msg = msg.into_text().expect("ser").replace("\n", "");
+        let msg = msg.into_text().expect("ser");
+        if msg.len() == 0 {
+            continue;
+        }
+        let str_payload : String = msg[0..msg.len() - 1].to_string();
+        let payload : bonzomatic::Payload= serde_json::from_str(&str_payload).expect(" ");
+     
         println!("{basename_id}:{update_received_count}");
-        writeln!(file, "{msg}").expect("Error writing Json to zip");
+
+        let payload = serde_json::to_string(&payload).expect("");
+        writeln!(file, "{payload}").expect("Error writing Json to zip");
         update_received_count += 1
     }
 }
