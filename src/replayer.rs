@@ -4,7 +4,9 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek};
 use std::time::SystemTime;
 use std::{thread, time};
-use tungstenite::{connect, Message};
+use tungstenite::{ Message};
+use tungstenite::client::connect_with_config;
+use tungstenite::protocol::WebSocketConfig;
 
 pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &str) {
     let start_time = SystemTime::now();
@@ -13,7 +15,9 @@ pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &s
     println!("Replay to {ws_url}");
 
     // Connect to websocket entrypoint
-    let (mut socket,mut response) = connect(&ws_url).expect("Can't connect");
+    let (mut socket, response) = connect_with_config(&ws_url,Some(WebSocketConfig{
+        max_send_queue:None,
+        max_message_size:None,max_frame_size:None,accept_unmasked_frames:true}),10).expect("Can't connect");
     println!("Connected to the server");
     println!("Response HTTP code: {}", response.status());
     println!("Response contains the following headers:");
@@ -36,12 +40,11 @@ pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &s
 
         let payload = serde_json::to_string(&payload).expect("Can' t serialize");
         let payload = payload+"\0"; // needed by Bonzomatic
-        match socket.write_message(Message::Text(payload)) {
-            Ok(_ ) => () ,
-            Err(_ ) =>  eprint!("Nope"),
-        }
-        
 
+        socket.write_message(Message::Text(payload)).expect("err");
+        #[warn(unused_must_use)]
+        socket.read_message();
+        
         println!("{filename} {current_idx}/{nb_lines} > {ws_url}");
         thread::sleep(time::Duration::from_millis(300)); // To parameterize
     }

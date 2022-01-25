@@ -36,7 +36,7 @@ pub fn record(protocol: &str, host: &str, room: &str, handle: &str) {
         // One json per line
         // Can't really serde, as bonzomatic sends a final `\0` that most of parser will consider as error
         let msg = msg.into_text().expect("ser");
-        if msg.len() == 0 {
+        if msg.is_empty() {
             continue;
         }
         let str_payload : String = msg[0..msg.len() - 1].to_string();
