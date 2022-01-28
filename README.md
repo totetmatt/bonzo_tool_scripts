@@ -9,7 +9,7 @@ Set of tool scripts for bonzomatic
 Record an entry from a websocket entrypoint
 
 USAGE:
-    bonzo_tool_scripts.exe recorder [OPTIONS] --host <HOST> --room <ROOM> <HANDLE>
+    bts.exe recorder [OPTIONS] --host <HOST> --room <ROOM> <HANDLE>
 
 ARGS:
     <HANDLE>    Handle
@@ -27,7 +27,7 @@ OPTIONS:
 Replay a saved entry to a websocket entrypoint
 
 USAGE:
-    bonzo_tool_scripts.exe replayer [OPTIONS] --host <HOST> --room <ROOM> <HANDLE> <FILE>
+    bts.exe replayer [OPTIONS] --host <HOST> --room <ROOM> <HANDLE> <FILE>
 
 ARGS:
     <HANDLE>    Handles
