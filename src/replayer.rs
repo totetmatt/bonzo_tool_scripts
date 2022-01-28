@@ -8,7 +8,7 @@ use tungstenite::{ Message};
 use tungstenite::client::connect_with_config;
 use tungstenite::protocol::WebSocketConfig;
 
-pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &str) {
+pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &str, update_interval: &u64) {
     let start_time = SystemTime::now();
     // Prepare Websocket url
     let ws_url = utils::get_ws_url(protocol, host, room, handle);
@@ -46,6 +46,6 @@ pub fn replay(protocol: &str, host: &str, room: &str, handle: &str, filename: &s
         socket.read_message();
         
         println!("{filename} {current_idx}/{nb_lines} > {ws_url}");
-        thread::sleep(time::Duration::from_millis(300)); // To parameterize
+        thread::sleep(time::Duration::from_millis(*update_interval)); // To parameterize
     }
 }

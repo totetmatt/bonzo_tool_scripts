@@ -28,9 +28,12 @@ enum Commands {
         #[clap(long)]
         room: String,
 
-        /// Handles
+        /// Handle
         handle: String,
+
+
     },
+    /// Replay a saved entry to a websocket entrypoint
     Replayer {
         /// Protocol
         #[clap( short, long, default_value_t = String::from("ws"))]
@@ -49,6 +52,10 @@ enum Commands {
 
         /// Input Json file
         file: String,
+
+        /// udpateInterval (ms)
+        #[clap( long, default_value_t = 300u64)]
+        update_interval: u64,
     },
 }
 
@@ -72,9 +79,10 @@ fn main() {
             room,
             handle,
             file,
+            update_interval
         } => {
             println!("{file}");
-            replayer::replay(protocol, host, room, handle, file);
+            replayer::replay(protocol, host, room, handle, file, update_interval);
             println!("End Replayer")
         }
     }
