@@ -4,9 +4,7 @@ use std::io::prelude::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tungstenite::connect;
 
-// "drone.alkama.com:9000/livecode/radio"
 /// Recorder for bonzomatic network websocket instance
-
 pub fn record(protocol: &str, host: &str, room: &str, handle: &str) {
     // Get useful data and formated data
     let ts = SystemTime::now()
