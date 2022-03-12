@@ -41,6 +41,38 @@ OPTIONS:
         --update-interval <UPDATE_INTERVAL>    udpateInterval (ms) [default: 300]
     -V, --version                              Print version information
 ```
+
+## Radio 
+```
+Send multiple shader at certain interval form a given playlist to an entrypoint, like a radio
+
+USAGE:
+    bts.exe radio [OPTIONS] --host <HOST> --room <ROOM> <HANDLE> <PATH>
+
+ARGS:
+    <HANDLE>    Handle
+    <PATH>      Glob path of source files (playlist)
+
+OPTIONS:
+    -h, --help                                 Print help information
+        --host <HOST>                          Host or Host:Port
+    -p, --protocol <PROTOCOL>                  Protocol [default: ws]
+        --room <ROOM>                          Room
+        --time-per-entry <TIME_PER_ENTRY>      Time of boradcast per entry (ms) [default: 10000]
+        --update-interval <UPDATE_INTERVAL>    udpateInterval (ms) [default: 500]
+    -V, --version                              Print version information
+```
+
+Example : 
+```
+bts.exe radio --host drone.alkama.com:9000 --room livecode radio_test demo\playlist\**\*.glsl
+```
+
+And read with bonzomatic like this : 
+```
+.\Bonzomatic_W64_GLFW.exe  skipdialog networkMode=grabber serverURL=ws://drone.alkama.com:9000/livecode/radio_test
+```
+
 ## Todo :
 
 - async queue for multi record (optim)
