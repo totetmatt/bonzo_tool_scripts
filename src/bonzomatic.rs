@@ -31,4 +31,25 @@ impl Payload {
     pub fn update_shader_time(&mut self , shader_time:f64 ) {
         self.data.shader_time = shader_time;
     }
+    pub fn from(anchor:u32,
+                caret: u32,
+                code: String,
+                compile: bool,
+                first_visible_line: u32,
+                nickname: String,  
+                room_name: String, 
+                shader_time:  f64 ) -> Self  {
+         Self {
+            data : Data{
+                anchor: anchor,
+                caret : caret,
+                code : code,
+                compile : compile,
+                first_visible_line : first_visible_line,
+                nickname,
+                room_name : room_name,
+                shader_time: shader_time
+            }
+        }
+    }
 }
