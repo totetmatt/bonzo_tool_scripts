@@ -2,6 +2,7 @@ pub mod bonzomatic;
 pub mod radio;
 pub mod recorder;
 pub mod replayer;
+pub mod server;
 
 mod utils;
 use clap::{AppSettings, Parser, Subcommand};
@@ -86,6 +87,7 @@ enum Commands {
         #[clap(long, default_value_t = 10000u64)]
         time_per_entry: u64,
     },
+    Server {},
 }
 
 fn main() {
@@ -132,6 +134,9 @@ fn main() {
                 update_interval,
                 time_per_entry,
             )
+        }
+        Commands::Server {} => {
+            server::run();
         }
     }
 }
