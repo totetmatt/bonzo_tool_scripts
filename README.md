@@ -65,12 +65,19 @@ OPTIONS:
 
 Example : 
 ```
-bts.exe radio --host drone.alkama.com:9000 --room livecode radio_test demo\playlist\**\*.glsl
+bts.exe radio --host drone.alkama.com:9000 --room test radio_test demo\playlist\**\*.glsl
 ```
 
 And read with bonzomatic like this : 
 ```
-.\Bonzomatic_W64_GLFW.exe  skipdialog networkMode=grabber serverURL=ws://drone.alkama.com:9000/livecode/radio_test
+.\Bonzomatic_W64_GLFW.exe  skipdialog networkMode=grabber serverURL=ws://drone.alkama.com:9000/test/radio_test
+```
+
+A long running radio will be playing a mix of glsl from https://livecode.demozoo.org at this address: `ws://drone.alkama.com:9000/livecode/radio`
+
+You can listen via bonzomatic via this command line : 
+```
+.\Bonzomatic_W64_GLFW.exe  skipdialog networkMode=grabber serverURL=ws://drone.alkama.com:9000/livecode/radio
 ```
 
 ## Todo :
