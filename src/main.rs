@@ -87,7 +87,11 @@ enum Commands {
         #[clap(long, default_value_t = 10000u64)]
         time_per_entry: u64,
     },
-    Server {},
+    Server {
+        /// Host or Host:Port
+        #[clap(long, default_value_t = String::from("0.0.0.0:8080"))]
+        bind_addr: String,
+    },
 }
 
 fn main() {
@@ -135,8 +139,10 @@ fn main() {
                 time_per_entry,
             )
         }
-        Commands::Server {} => {
-            server::run();
-        }
+        Commands::Server { bind_addr } => tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(server::main(bind_addr)),
     }
 }

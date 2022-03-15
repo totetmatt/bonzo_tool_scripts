@@ -5,9 +5,15 @@ edition = "2018"
 
 [dependencies]
 clap = { version = "3.0.0", features = ["derive"] }
-tungstenite = "0.16.0"
+
 serde_json = "1.0.78"
 serde = { version = "1.0", features = ["derive"] }
 glob = "0.3.0"
 rand = "0.8.4"
 uuid = { version = "0.8", features = ["serde", "v4"] }
+
+tokio-tungstenite = "*"
+tokio = { version = "1.17.0", features = ["full"] }
+futures-util = "0.3"
+futures-channel = "0.3.21"
+tungstenite = "0.17.2"
