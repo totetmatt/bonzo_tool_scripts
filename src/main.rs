@@ -3,6 +3,7 @@ pub mod radio;
 pub mod recorder;
 pub mod replayer;
 pub mod server;
+use log::info;
 
 mod utils;
 use clap::{Parser, Subcommand};
@@ -100,6 +101,7 @@ enum Commands {
 }
 
 fn main() {
+    env_logger::init();
     let cli = Bts::parse();
     match &cli.command {
         Commands::Recorder {
@@ -108,9 +110,9 @@ fn main() {
             room,
             handle,
         } => {
-            println!("Start Recorder");
+            info!("Start Recorder");
             recorder::record(protocol, host, room, handle);
-            println!("End Recorder")
+            info!("End Recorder")
         }
         Commands::Replayer {
             protocol,
@@ -120,9 +122,9 @@ fn main() {
             file,
             update_interval,
         } => {
-            println!("{file}");
+            info!("{file}");
             replayer::replay(protocol, host, room, handle, file, update_interval);
-            println!("End Replayer")
+            info!("End Replayer")
         }
         Commands::Radio {
             protocol,
@@ -133,7 +135,7 @@ fn main() {
             update_interval,
             time_per_entry,
         } => {
-            println!("Starting Radio");
+            info!("Starting Radio");
             radio::radio(
                 protocol,
                 host,

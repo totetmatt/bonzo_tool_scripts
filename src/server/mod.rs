@@ -1,10 +1,11 @@
-pub mod bonzoendpoint;
+pub mod wsbonzoendpoint;
 use crate::bonzomatic;
-use crate::utils;
-use bonzoendpoint::BonzoEndpoint;
+
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use futures_util::{future, pin_mut, stream::TryStreamExt, StreamExt};
+use wsbonzoendpoint::WsBonzoEndpoint;
 
+use log::{info, warn};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -18,14 +19,13 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::protocol::Message;
-
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<RwLock<HashMap<SocketAddr, Tx>>>;
-type InstanceMap = Arc<RwLock<HashMap<SocketAddr, Arc<BonzoEndpoint>>>>;
+type InstanceMap = Arc<RwLock<HashMap<SocketAddr, Arc<WsBonzoEndpoint>>>>;
 
 struct FileSaveMessage {
     message: Message,
-    meta: Arc<BonzoEndpoint>,
+    meta: Arc<WsBonzoEndpoint>,
 }
 
 async fn handle_connection(
@@ -35,12 +35,12 @@ async fn handle_connection(
     addr: SocketAddr,
     sender: Option<Sender<FileSaveMessage>>,
 ) {
-    println!("Incoming TCP connection from: {}", addr);
-    let mut endpoint = Arc::new(BonzoEndpoint::empty());
+    info!("Incoming TCP connection from: {}", addr);
+    let mut endpoint = Arc::new(WsBonzoEndpoint::empty());
     let callback = |req: &Request, response: Response| {
-        match BonzoEndpoint::parse_resource(req.uri().path()) {
+        match WsBonzoEndpoint::parse_resource(req.uri().path()) {
             Ok(e) => endpoint = Arc::new(e),
-            Err(e) => println!("{e}"),
+            Err(e) => info!("{e}"),
         }
         Ok(response)
     };
@@ -48,8 +48,8 @@ async fn handle_connection(
     let ws_stream = tokio_tungstenite::accept_hdr_async(raw_stream, callback)
         .await
         .expect("Error during the websocket handshake occurred");
-    println!("WebSocket connection established: {}", addr);
-    println!("{endpoint:?}");
+    info!("WebSocket connection established: {}", addr);
+    info!("{endpoint:?}");
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
     {
@@ -92,7 +92,7 @@ async fn handle_connection(
     let receive_from_others = rx.map(Ok).forward(outgoing);
     pin_mut!(broadcast_incoming, receive_from_others);
     future::select(broadcast_incoming, receive_from_others).await;
-    println!("{} disconnected", &addr);
+    info!("{} disconnected", &addr);
     {
         peer_map.write().unwrap().remove(&addr);
         instance_map.write().unwrap().remove(&addr);
@@ -142,7 +142,7 @@ async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>, dir_path: Path
                 );
             }
             Err(_) => {
-                eprintln!("Error, not valid entrypoint for saving to file");
+                warn!("Error, not valid entrypoint for saving to file");
             }
         }
     }
@@ -154,15 +154,15 @@ pub async fn main(addr: &String, save_shader_disable: bool, save_shader_dir: &Pa
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(addr.to_owned()).await;
     let listener = try_socket.expect("Failed to bind");
-    println!("Listening on: {}", addr);
+    info!("Listening on: {}", addr);
     let sender = if !save_shader_disable {
         let (ctx, crx) = mpsc::channel::<FileSaveMessage>(256);
-        println!("Save shaders in {}", save_shader_dir.display());
+        info!("Save shaders in {}", save_shader_dir.display());
         create_dir_all(save_shader_dir).await.unwrap();
         tokio::spawn(save_message_in_file(crx, save_shader_dir.to_owned()));
         Some(ctx)
     } else {
-        println!("Not saving shaders");
+        info!("Not saving shaders");
         None
     };
     // Let's spawn the handling of each connection in a separate task.
