@@ -5,12 +5,10 @@ pub mod replayer;
 pub mod server;
 
 mod utils;
-use clap::{AppSettings, Parser, Subcommand};
-
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(author, version, about)]
-#[clap(global_setting(AppSettings::PropagateVersion))]
-#[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
 struct Bts {
     #[clap(subcommand)]
     command: Commands,
@@ -91,6 +89,13 @@ enum Commands {
         /// Host or Host:Port
         #[clap(long, default_value_t = String::from("0.0.0.0:8080"))]
         bind_addr: String,
+
+        #[clap(long)]
+        save_shader_disable: bool,
+
+        /// Sets a custom config file
+        #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
+        save_shader_dir: PathBuf,
     },
 }
 
@@ -139,10 +144,18 @@ fn main() {
                 time_per_entry,
             )
         }
-        Commands::Server { bind_addr } => tokio::runtime::Builder::new_multi_thread()
+        Commands::Server {
+            bind_addr,
+            save_shader_disable,
+            save_shader_dir,
+        } => tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap()
-            .block_on(server::main(bind_addr)),
+            .block_on(server::main(
+                bind_addr,
+                *save_shader_disable,
+                save_shader_dir,
+            )),
     }
 }

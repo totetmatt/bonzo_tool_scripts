@@ -8,6 +8,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
+use tokio::fs::create_dir_all;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
@@ -30,7 +31,7 @@ async fn handle_connection(
     instance_map: InstanceMap,
     raw_stream: TcpStream,
     addr: SocketAddr,
-    sender: Sender<FileSaveMessage>,
+    sender: Option<Sender<FileSaveMessage>>,
 ) {
     println!("Incoming TCP connection from: {}", addr);
     let mut endpoint = Arc::new(BonzoEndpoint::empty());
@@ -59,11 +60,16 @@ async fn handle_connection(
     let (outgoing, incoming) = ws_stream.split();
 
     let broadcast_incoming = incoming.try_for_each(|msg| {
-        let send_msg_to_save_queue = sender.try_send(FileSaveMessage {
-            message: msg.clone(),
-            meta: Arc::clone(&endpoint),
-        });
-        tokio::spawn(async { send_msg_to_save_queue });
+        match &sender {
+            Some(s) => {
+                let send_msg_to_save_queue = s.try_send(FileSaveMessage {
+                    message: msg.clone(),
+                    meta: Arc::clone(&endpoint),
+                });
+                tokio::spawn(async { send_msg_to_save_queue });
+            }
+            None => (),
+        };
 
         let peers = peer_map.read().unwrap();
         let instance = instance_map.read().unwrap();
@@ -91,11 +97,12 @@ async fn handle_connection(
     }
 }
 
-async fn save_history(filename: &String, msg: Message) {
+async fn save_history(mut dir_path: PathBuf, filename: &String, msg: Message) {
+    dir_path.push(filename);
     let mut file = OpenOptions::new()
         .append(true)
         .create(true)
-        .open(filename)
+        .open(dir_path)
         .await
         .unwrap();
 
@@ -104,11 +111,12 @@ async fn save_history(filename: &String, msg: Message) {
         .unwrap();
     file.sync_all().await.unwrap()
 }
-async fn save_current(filename: &String, msg: Message) {
+async fn save_current(mut dir_path: PathBuf, filename: &String, msg: Message) {
+    dir_path.push("last_".to_owned() + filename);
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
-        .open("last_".to_owned() + filename)
+        .open(dir_path)
         .await
         .unwrap();
 
@@ -117,13 +125,13 @@ async fn save_current(filename: &String, msg: Message) {
         .unwrap();
     file.sync_all().await.unwrap()
 }
-async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>) {
+async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
     while let Some(message) = crx.recv().await {
         match message.meta.json_filename() {
             Ok(filename) => {
                 tokio::join!(
-                    save_current(&filename, message.message.clone()),
-                    save_history(&filename, message.message.clone()),
+                    save_current(dir_path.clone(), &filename, message.message.clone()),
+                    save_history(dir_path.clone(), &filename, message.message.clone()),
                 );
             }
             Err(_) => {
@@ -132,16 +140,24 @@ async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>) {
         }
     }
 }
-
-pub async fn main(addr: &String) -> () {
+use std::path::PathBuf;
+pub async fn main(addr: &String, save_shader_disable: bool, save_shader_dir: &PathBuf) -> () {
     let state = PeerMap::new(RwLock::new(HashMap::new()));
     let instances = InstanceMap::new(RwLock::new(HashMap::new()));
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(addr.to_owned()).await;
     let listener = try_socket.expect("Failed to bind");
     println!("Listening on: {}", addr);
-    let (ctx, crx) = mpsc::channel::<FileSaveMessage>(32);
-    tokio::spawn(save_message_in_file(crx));
+    let sender = if !save_shader_disable {
+        let (ctx, crx) = mpsc::channel::<FileSaveMessage>(256);
+        println!("Save shaders in {}", save_shader_dir.display());
+        create_dir_all(save_shader_dir).await.unwrap();
+        tokio::spawn(save_message_in_file(crx, save_shader_dir.to_owned()));
+        Some(ctx)
+    } else {
+        println!("Not saving shaders");
+        None
+    };
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, addr)) = listener.accept().await {
         tokio::spawn(handle_connection(
@@ -149,7 +165,7 @@ pub async fn main(addr: &String) -> () {
             instances.clone(),
             stream,
             addr,
-            ctx.clone(),
+            sender.as_ref().map(|x| x.clone()),
         ));
     }
 }
