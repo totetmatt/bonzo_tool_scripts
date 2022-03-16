@@ -1,18 +1,21 @@
-use glob::glob;
-use std::path::PathBuf;
-
-use rand::prelude::*;
-use std::{thread, time};
-
-use std::fs;
-
 use crate::bonzomatic;
 use crate::utils;
-use bonzomatic::Payload;
+use futures_util::{future, pin_mut};
+use futures_util::{SinkExt, StreamExt};
+use glob::glob;
+use log::info;
+use rand::prelude::*;
+use std::path::PathBuf;
 use std::time::SystemTime;
-use tungstenite::client::connect_with_config;
-use tungstenite::protocol::WebSocketConfig;
-use tungstenite::Message;
+use tokio::fs::read_to_string;
+use tokio::time::{sleep, Duration};
+
+use tokio_tungstenite::connect_async;
+fn credential_header(name: &str) -> String {
+    String::from(format!(
+        "\n/****\nRadio bonzo\n\nCredit: \n {name} \n****/\n"
+    ))
+}
 fn playlist_from_path(path: String) -> Vec<PathBuf> {
     let mut playlist = Vec::new();
 
@@ -24,16 +27,10 @@ fn playlist_from_path(path: String) -> Vec<PathBuf> {
     }
     playlist
 }
-fn credential_header(name: &str) -> String {
-    String::from(format!(
-        "\n/****\nRadio bonzo\n\nCredit: \n {name} \n****/\n"
-    ))
-}
-fn credited_source(filepath: &str) -> String {
+async fn credited_source(filepath: &str) -> String {
+    let contents = read_to_string(filepath).await.unwrap();
     let filepath: PathBuf = PathBuf::from(filepath);
     let filename = filepath.file_name().unwrap().to_str().unwrap();
-    let contents = fs::read_to_string(filepath.to_str().unwrap())
-        .expect("Something went wrong reading the file");
     let end_of_first_line = contents.find("\n").unwrap() + 1;
     let (head_file, tail_file) = contents.split_at(end_of_first_line);
     let mut result_file = head_file.to_owned();
@@ -41,7 +38,8 @@ fn credited_source(filepath: &str) -> String {
     result_file.push_str(&tail_file);
     result_file.to_owned()
 }
-pub fn radio(
+/// Radio mode 
+pub async fn radio(
     protocol: &str,
     host: &str,
     room: &str,
@@ -50,60 +48,52 @@ pub fn radio(
     update_interval: &u64,
     time_per_entry: &u64,
 ) {
-    let mut rng = rand::thread_rng();
-    loop {
-        let mut vec: Vec<PathBuf> = playlist_from_path(String::from(path));
-        vec.shuffle(&mut rng);
-        let start_time = SystemTime::now();
+    // Prepare Websocket url
+    let ws_url = utils::get_ws_url(protocol, host, room, handle);
+    info!("Replay to {ws_url}");
 
-        while vec.len() != 0 {
-            let current = vec.pop();
-            println!("{:?}", current);
-            let source = credited_source(current.unwrap().to_str().unwrap());
+    let (ws_stream, _) = connect_async(ws_url).await.expect("Failed to connect");
+    info!("WebSocket handshake has been successfully completed");
 
-            // Prepare Websocket url
-            let ws_url = utils::get_ws_url(protocol, host, room, handle);
-            println!("Sending to to {ws_url}");
+    let (mut write, read) = ws_stream.split();
 
-            // Connect to websocket entrypoint
-            let (mut socket, _) = connect_with_config(
-                &ws_url,
-                Some(WebSocketConfig {
-                    max_send_queue: None,
-                    max_message_size: None,
-                    max_frame_size: None,
-                    accept_unmasked_frames: true,
-                }),
-                10,
-            )
-            .expect("Can't connect");
-            // Prepare payload, only time will change later
-            let mut payload = Payload::from(
-                0u32,
-                0,
-                source,
-                true,
-                0,
-                String::from("radio"),
-                String::from(room),
-                0f64,
-            );
-            // Bonzomatic net asks to send regular
-            for _ in 0..(time_per_entry / update_interval) {
-                let since_start = SystemTime::now()
-                    .duration_since(start_time)
-                    .expect("Time went backwards");
-                payload.update_shader_time(since_start.as_secs_f64());
-                let payload = serde_json::to_string(&payload).expect("Can' t serialize");
-                let payload = payload + "\0"; // needed by Bonzomatic
+    // We need to consume the read stream or the  websocket connection get interrupted
+    let ws_read = { read.for_each(|_| async { () }) };
 
-                socket.write_message(Message::Text(payload)).expect("err");
-                #[warn(unused_must_use)]
-                socket.read_message().unwrap();
-
-                let sleep_time = time::Duration::from_millis(*update_interval);
-                thread::sleep(sleep_time);
+    let ws_write = async {
+        let mut rng = rand::thread_rng();
+        loop {
+            let mut vec: Vec<PathBuf> = playlist_from_path(String::from(path));
+            vec.shuffle(&mut rng);
+            let start_time = SystemTime::now();
+            info!("Radio");
+            while vec.len() != 0 {
+                let current = vec.pop().unwrap();
+                info!("{:?}", current);
+                let source = credited_source(current.to_str().unwrap()).await;
+                // Prepare payload, only time will change later
+                let mut payload = bonzomatic::Payload::from(
+                    0u32,
+                    0,
+                    source,
+                    true,
+                    0,
+                    String::from("radio"),
+                    String::from(room),
+                    0f64,
+                );
+                for _ in 0..(time_per_entry / update_interval) {
+                    let since_start = SystemTime::now()
+                        .duration_since(start_time)
+                        .expect("Time went backwards");
+                    payload.update_shader_time(since_start.as_secs_f64());
+                    let payload=payload.to_message();
+                    write.send(payload).await.unwrap();
+                    sleep(Duration::from_millis(*update_interval)).await;
+                }
             }
         }
-    }
+    };
+    pin_mut!(ws_write, ws_read);
+    future::select(ws_write, ws_read).await;
 }

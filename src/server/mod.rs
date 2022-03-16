@@ -1,24 +1,25 @@
-pub mod wsbonzoendpoint;
-use crate::bonzomatic;
+mod wsbonzoendpoint;
 
+use crate::bonzomatic;
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use futures_util::{future, pin_mut, stream::TryStreamExt, StreamExt};
 use wsbonzoendpoint::WsBonzoEndpoint;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::{
     collections::HashMap,
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
 use tokio::fs::create_dir_all;
-use tokio::fs::OpenOptions;
-use tokio::io::AsyncWriteExt;
+
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::protocol::Message;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<RwLock<HashMap<SocketAddr, Tx>>>;
 type InstanceMap = Arc<RwLock<HashMap<SocketAddr, Arc<WsBonzoEndpoint>>>>;
@@ -26,6 +27,7 @@ type InstanceMap = Arc<RwLock<HashMap<SocketAddr, Arc<WsBonzoEndpoint>>>>;
 struct FileSaveMessage {
     message: Message,
     meta: Arc<WsBonzoEndpoint>,
+    ts: u128
 }
 
 async fn handle_connection(
@@ -35,6 +37,10 @@ async fn handle_connection(
     addr: SocketAddr,
     sender: Option<Sender<FileSaveMessage>>,
 ) {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
     info!("Incoming TCP connection from: {}", addr);
     let mut endpoint = Arc::new(WsBonzoEndpoint::empty());
     let callback = |req: &Request, response: Response| {
@@ -64,9 +70,11 @@ async fn handle_connection(
     let broadcast_incoming = incoming.try_for_each(|msg| {
         match &sender {
             Some(s) => {
+               
                 let send_msg_to_save_queue = s.try_send(FileSaveMessage {
                     message: msg.clone(),
                     meta: Arc::clone(&endpoint),
+                    ts: ts
                 });
                 tokio::spawn(async { send_msg_to_save_queue });
             }
@@ -99,56 +107,29 @@ async fn handle_connection(
     }
 }
 
-async fn save_history(mut dir_path: PathBuf, filename: &String, msg: &String) {
-    dir_path.push(filename);
-    let mut file = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(dir_path)
-        .await
-        .unwrap();
-
-    file.write_all((msg.to_owned() + "\n").as_bytes())
-        .await
-        .unwrap();
-    file.sync_all().await.unwrap()
-}
-async fn save_current(mut dir_path: PathBuf, filename: &String, msg: &String) {
-    dir_path.push("last_".to_owned() + filename);
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(dir_path)
-        .await
-        .unwrap();
-
-    file.write_all(msg.as_bytes()).await.unwrap();
-    file.sync_all().await.unwrap()
-}
-async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
+async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
     while let Some(message) = crx.recv().await {
-        let msg = message.message.into_text().expect("ser");
-        if msg.is_empty() {
-            continue;
-        }
-        let str_payload: String = msg[0..msg.len() - 1].to_string();
-        let payload: bonzomatic::Payload = serde_json::from_str(&str_payload).expect(" ");
-        let payload = serde_json::to_string(&payload).expect("");
-        match message.meta.json_filename() {
-            Ok(filename) => {
-                tokio::join!(
-                    save_current(dir_path.clone(), &filename, &payload),
-                    save_history(dir_path.clone(), &filename, &payload),
-                );
+        match message.message {
+            Message::Ping(_) => debug!("Ping"),
+            Message::Text(_) => {
+                let payload: bonzomatic::Payload =
+                    bonzomatic::Payload::from_message(&message.message);
+                match message.meta.filename(&message.ts) {
+                    Ok(filename) => {
+                        payload.save(&dir_path, &filename).await;
+                    }
+                    Err(_) => {
+                        warn!("Error, not valid entrypoint for saving to file");
+                    }
+                }
             }
-            Err(_) => {
-                warn!("Error, not valid entrypoint for saving to file");
-            }
+
+            _ => (),
         }
     }
 }
 use std::path::PathBuf;
-pub async fn main(addr: &String, save_shader_disable: bool, save_shader_dir: &PathBuf) -> () {
+pub async fn main(addr: &String, save_shader_disable: &bool, save_shader_dir: &PathBuf) -> () {
     let state = PeerMap::new(RwLock::new(HashMap::new()));
     let instances = InstanceMap::new(RwLock::new(HashMap::new()));
     // Create the event loop and TCP listener we'll accept connections on.
@@ -159,7 +140,7 @@ pub async fn main(addr: &String, save_shader_disable: bool, save_shader_dir: &Pa
         let (ctx, crx) = mpsc::channel::<FileSaveMessage>(256);
         info!("Save shaders in {}", save_shader_dir.display());
         create_dir_all(save_shader_dir).await.unwrap();
-        tokio::spawn(save_message_in_file(crx, save_shader_dir.to_owned()));
+        tokio::spawn(save_message(crx, save_shader_dir.to_owned()));
         Some(ctx)
     } else {
         info!("Not saving shaders");

@@ -82,8 +82,8 @@ You can listen via bonzomatic via this command line :
 
 ## Todo :
 
-- async queue for multi record (optim)
-- Use client non blocking for replayer, so write and read don't interfere
 - Timeline ui to control the replay
+- Option to launch preconfigured bonzomatic or generate command line for replayer and recorder
+  - Option to launch a local server to avoid remote server dependecies (offline mode ?)
 
 I'm learning Rust and a potato developer on this language. Feel free to PR so I can learn :)
