@@ -1,4 +1,6 @@
 pub mod bonzoendpoint;
+use crate::bonzomatic;
+use crate::utils;
 use bonzoendpoint::BonzoEndpoint;
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use futures_util::{future, pin_mut, stream::TryStreamExt, StreamExt};
@@ -97,7 +99,7 @@ async fn handle_connection(
     }
 }
 
-async fn save_history(mut dir_path: PathBuf, filename: &String, msg: Message) {
+async fn save_history(mut dir_path: PathBuf, filename: &String, msg: &String) {
     dir_path.push(filename);
     let mut file = OpenOptions::new()
         .append(true)
@@ -106,12 +108,12 @@ async fn save_history(mut dir_path: PathBuf, filename: &String, msg: Message) {
         .await
         .unwrap();
 
-    file.write_all((msg.into_text().unwrap() + &"\n").as_bytes())
+    file.write_all((msg.to_owned() + "\n").as_bytes())
         .await
         .unwrap();
     file.sync_all().await.unwrap()
 }
-async fn save_current(mut dir_path: PathBuf, filename: &String, msg: Message) {
+async fn save_current(mut dir_path: PathBuf, filename: &String, msg: &String) {
     dir_path.push("last_".to_owned() + filename);
     let mut file = OpenOptions::new()
         .write(true)
@@ -120,18 +122,23 @@ async fn save_current(mut dir_path: PathBuf, filename: &String, msg: Message) {
         .await
         .unwrap();
 
-    file.write_all(msg.to_text().unwrap().as_bytes())
-        .await
-        .unwrap();
+    file.write_all(msg.as_bytes()).await.unwrap();
     file.sync_all().await.unwrap()
 }
 async fn save_message_in_file(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
     while let Some(message) = crx.recv().await {
+        let msg = message.message.into_text().expect("ser");
+        if msg.is_empty() {
+            continue;
+        }
+        let str_payload: String = msg[0..msg.len() - 1].to_string();
+        let payload: bonzomatic::Payload = serde_json::from_str(&str_payload).expect(" ");
+        let payload = serde_json::to_string(&payload).expect("");
         match message.meta.json_filename() {
             Ok(filename) => {
                 tokio::join!(
-                    save_current(dir_path.clone(), &filename, message.message.clone()),
-                    save_history(dir_path.clone(), &filename, message.message.clone()),
+                    save_current(dir_path.clone(), &filename, &payload),
+                    save_history(dir_path.clone(), &filename, &payload),
                 );
             }
             Err(_) => {
