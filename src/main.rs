@@ -1,12 +1,13 @@
-pub mod bonzomatic;
-pub mod radio;
-pub mod recorder;
-pub mod replayer;
-pub mod server;
-use log::info;
-
+mod bonzomatic;
+mod radio;
+mod recorder;
+mod replayer;
+mod server;
 mod utils;
 use clap::{Parser, Subcommand};
+use core::future::Future;
+use log::info;
+use log::LevelFilter;
 use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -100,8 +101,16 @@ enum Commands {
     },
 }
 
+fn start_tokio<F: Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
+
 fn main() {
-    env_logger::init();
+    env_logger::builder().filter_level(LevelFilter::Info).init();
     let cli = Bts::parse();
     match &cli.command {
         Commands::Recorder {
@@ -111,7 +120,7 @@ fn main() {
             handle,
         } => {
             info!("Start Recorder");
-            recorder::record(protocol, host, room, handle);
+            start_tokio(recorder::record(protocol, host, room, handle));
             info!("End Recorder")
         }
         Commands::Replayer {
@@ -123,7 +132,14 @@ fn main() {
             update_interval,
         } => {
             info!("{file}");
-            replayer::replay(protocol, host, room, handle, file, update_interval);
+            start_tokio(replayer::replay(
+                protocol,
+                host,
+                room,
+                handle,
+                file,
+                update_interval,
+            ));
             info!("End Replayer")
         }
         Commands::Radio {
@@ -136,7 +152,7 @@ fn main() {
             time_per_entry,
         } => {
             info!("Starting Radio");
-            radio::radio(
+            start_tokio(radio::radio(
                 protocol,
                 host,
                 room,
@@ -144,20 +160,16 @@ fn main() {
                 path,
                 update_interval,
                 time_per_entry,
-            )
+            ));
         }
         Commands::Server {
             bind_addr,
             save_shader_disable,
             save_shader_dir,
-        } => tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(server::main(
-                bind_addr,
-                *save_shader_disable,
-                save_shader_dir,
-            )),
+        } => start_tokio(server::main(
+            bind_addr,
+            save_shader_disable,
+            save_shader_dir,
+        )),
     }
 }

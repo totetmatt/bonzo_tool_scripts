@@ -1,49 +1,44 @@
-use crate::utils;
-use crate::bonzomatic;
-use std::io::prelude::*;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tungstenite::connect;
+//! Recorder Mode
 
-/// Recorder for bonzomatic network websocket instance
-pub fn record(protocol: &str, host: &str, room: &str, handle: &str) {
-    // Get useful data and formated data
+use crate::bonzomatic;
+use crate::utils;
+use futures_util::StreamExt;
+use log::{debug, info};
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio_tungstenite::connect_async;
+use tungstenite::protocol::Message;
+
+/// Record function
+pub async fn record(protocol: &str, host: &str, room: &str, handle: &str) {
+    // Prepare Websocket url
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
+
     let basename_id = utils::get_file_basename(room, handle, &ts);
-
-    // Prepare file
-    let filename = &format!("{basename_id}.json");
-    let path = std::path::Path::new(filename);
-    let mut file = &std::fs::File::create(&path).expect("Error creating file");
-
-    //WS Connect, as listener / client only
     let ws_url = utils::get_ws_url(protocol, host, room, handle);
-    let (mut socket, response) = connect(&ws_url).expect("Can't connect");
+    info!("Record from to {ws_url}");
 
-    println!("Connected to the server");
-    println!("Response HTTP code: {}", response.status());
-    println!("Response contains the following headers:");
-    for (ref header, _value) in response.headers() {
-        println!("* {}", header);
-    }
-    let mut update_received_count: u128 = 0;
-    loop {
-        let msg = socket.read_message().expect("Error reading message");
-        // One json per line
-        // Can't really serde, as bonzomatic sends a final `\0` that most of parser will consider as error
-        let msg = msg.into_text().expect("ser");
-        if msg.is_empty() {
-            continue;
-        }
-        let str_payload : String = msg[0..msg.len() - 1].to_string();
-        let payload : bonzomatic::Payload= serde_json::from_str(&str_payload).expect(" ");
-     
-        println!("{basename_id}:{update_received_count}");
+    let (ws_stream, _) = connect_async(ws_url).await.expect("Failed to connect");
+    info!("WebSocket handshake has been successfully completed");
 
-        let payload = serde_json::to_string(&payload).expect("");
-        writeln!(file, "{payload}").expect("Error writing Json to zip");
-        update_received_count += 1
-    }
+    let (_, read) = ws_stream.split();
+    let ws_read = {
+        read.for_each(|message| async {
+            match message {
+                Ok(data) => match data {
+                    Message::Ping(_) => debug!("Ping!"),
+                    Message::Text(_) => {
+                        let payload: bonzomatic::Payload = bonzomatic::Payload::from_message(&data);
+                        payload.save(&PathBuf::from("./"), &basename_id).await;
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+        })
+    };
+    ws_read.await
 }
