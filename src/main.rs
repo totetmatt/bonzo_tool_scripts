@@ -9,6 +9,7 @@ use core::future::Future;
 use log::info;
 use log::LevelFilter;
 use std::path::PathBuf;
+use std::process::Command;
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Bts {
@@ -109,6 +110,23 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
+fn start_tokio_2<F: Future>(future: F) -> F::Output {
+    Command::new("./bonzomatic")
+        .current_dir("/home/totetmatt/playground/Bonzomatic")
+        .arg("skipdialog")
+        .arg("networkMode=sender")
+        .arg(format!(
+            "serverURL={}",
+            &"ws://drone.alkama.com:9000/livecode/replayer"
+        ))
+        .spawn()
+        .expect("");
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
 fn main() {
     env_logger::builder().filter_level(LevelFilter::Info).init();
     let cli = Bts::parse();
