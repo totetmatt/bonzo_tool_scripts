@@ -1,4 +1,5 @@
 mod bonzomatic;
+mod bonzomaticluncher;
 mod radio;
 mod recorder;
 mod replayer;
@@ -10,12 +11,14 @@ use log::info;
 use log::LevelFilter;
 use std::path::PathBuf;
 use std::process::Command;
+
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Bts {
     #[clap(subcommand)]
     command: Commands,
 }
+
 #[derive(Subcommand)]
 enum Commands {
     /// Record an entry from a websocket entrypoint
@@ -111,16 +114,22 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
 }
 
 fn start_tokio_2<F: Future>(future: F) -> F::Output {
-    Command::new("./bonzomatic")
-        .current_dir("/home/totetmatt/playground/Bonzomatic")
-        .arg("skipdialog")
-        .arg("networkMode=sender")
-        .arg(format!(
-            "serverURL={}",
-            &"ws://drone.alkama.com:9000/livecode/replayer"
-        ))
-        .spawn()
-        .expect("");
+    /*Command::new("./bonzomatic")
+    .current_dir("/home/totetmatt/playground/Bonzomatic")
+    .arg("skipdialog")
+    .arg("networkMode=sender")
+    .arg(format!(
+        "serverURL={}",
+        &"ws://drone.alkama.com:9000/livecode/replayer"
+    ))
+    .spawn()
+    .expect("");*/
+    bonzomaticluncher::bonzomatic_args(
+        &String::from(r#"C:\Users\totetmatt\Downloads\Bonzo_Network_12_x64"#),
+        true,
+        bonzomaticluncher::NetworkMode::Grabber,
+        &String::from("ws://drone.alkama.com:9000/livecode/replay"),
+    );
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -150,7 +159,15 @@ fn main() {
             update_interval,
         } => {
             info!("{file}");
-            start_tokio(replayer::replay(
+            /*start_tokio(replayer::replay(
+                protocol,
+                host,
+                room,
+                handle,
+                file,
+                update_interval,
+            ));*/
+            start_tokio_2(replayer::replay(
                 protocol,
                 host,
                 room,
