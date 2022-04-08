@@ -10,7 +10,6 @@ use core::future::Future;
 use log::info;
 use log::LevelFilter;
 use std::path::PathBuf;
-use std::process::Command;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -96,12 +95,26 @@ enum Commands {
         #[clap(long, default_value_t = String::from("0.0.0.0:8080"))]
         bind_addr: String,
 
+        /// Disable shader autosave
         #[clap(long)]
         save_shader_disable: bool,
 
         /// Sets a custom config file
         #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
         save_shader_dir: PathBuf,
+    },
+    BonzoRecord {
+        /// Sets a custom config file
+        #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
+        save_shader_dir: PathBuf,
+
+        /// Root of Bonzomatic Directory
+        #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
+        bonzomatic_path: PathBuf,
+
+        /// Your handle
+        #[clap( long, default_value_t = String::from("shader"))]
+        handle: String,
     },
 }
 
@@ -113,22 +126,17 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
-fn start_tokio_2<F: Future>(future: F) -> F::Output {
-    /*Command::new("./bonzomatic")
-    .current_dir("/home/totetmatt/playground/Bonzomatic")
-    .arg("skipdialog")
-    .arg("networkMode=sender")
-    .arg(format!(
-        "serverURL={}",
-        &"ws://drone.alkama.com:9000/livecode/replayer"
-    ))
-    .spawn()
-    .expect("");*/
+fn start_tokio_with_bonzomatic<F: Future>(
+    future: F,
+    bonzomatic_path: &PathBuf,
+    handle: &String,
+) -> F::Output {
+    let os_string = bonzomatic_path.as_path();
     bonzomaticluncher::bonzomatic_args(
-        &String::from(r#"C:\Users\totetmatt\Downloads\Bonzo_Network_12_x64"#),
+        &String::from(os_string.as_os_str().to_str().unwrap()),
         true,
-        bonzomaticluncher::NetworkMode::Grabber,
-        &String::from("ws://drone.alkama.com:9000/livecode/replay"),
+        bonzomaticluncher::NetworkMode::Sender,
+        &utils::get_ws_url("ws", "127.0.0.1:8080", "local_recorder", handle),
     );
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -140,6 +148,19 @@ fn main() {
     env_logger::builder().filter_level(LevelFilter::Info).init();
     let cli = Bts::parse();
     match &cli.command {
+        Commands::BonzoRecord {
+            save_shader_dir,
+            bonzomatic_path,
+            handle,
+        } => {
+            info!("Start Local Recorder");
+            start_tokio_with_bonzomatic(
+                server::main(&String::from("0.0.0.0:8080"), &false, save_shader_dir),
+                bonzomatic_path,
+                handle,
+            );
+            info!("End Local Recorder")
+        }
         Commands::Recorder {
             protocol,
             host,
@@ -159,15 +180,7 @@ fn main() {
             update_interval,
         } => {
             info!("{file}");
-            /*start_tokio(replayer::replay(
-                protocol,
-                host,
-                room,
-                handle,
-                file,
-                update_interval,
-            ));*/
-            start_tokio_2(replayer::replay(
+            start_tokio(replayer::replay(
                 protocol,
                 host,
                 room,

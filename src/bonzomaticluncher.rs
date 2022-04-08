@@ -1,13 +1,14 @@
+use std::path::PathBuf;
 use std::process::Command;
+#[warn(dead_code)]
 pub enum NetworkMode {
     Sender,
     Grabber,
 }
 fn get_network_mode(mode: NetworkMode) -> String {
-    let varname = "networkMode";
     match mode {
-        NetworkMode::Sender => format!("{varname}=sender"),
-        NetworkMode::Grabber => format!("{varname}=grabber"),
+        NetworkMode::Sender => String::from("networkMode=sender"),
+        NetworkMode::Grabber => String::from("networkMode=grabber"),
     }
 }
 fn get_server_url(url: &String) -> String {
@@ -25,18 +26,9 @@ pub fn bonzomatic_args(
     }
     v.push(get_network_mode(network_mode));
     v.push(get_server_url(server_url));
-    let mut c = Command::new(r#".\Bonzomatic_W64_GLFW.exe"#);
-    c.current_dir(bonzo_dir).args(v);
-    println!("{:?}", c);
-    c.spawn().unwrap()
-    /*
-    let &mut c: Command = Command::new("./bonzomatic");
-    c = c.current_dir("/home/totetmatt/playground/Bonzomatic");
-    if skipdialog {
-        c = c.arg("skipdialog");
-    }bonzomaticluncher::bonzomatic_cmd(true);
-    c = c.arg("skipdialog").arg("networkMode=sender").arg(format!(
-        "serverURL={}",
-        &"ws://drone.alkama.com:9000/livecode/replayer"
-    ));*/
+    let path: PathBuf = [bonzo_dir, r#"Bonzomatic_W64_GLFW.exe"#].iter().collect();
+    let mut cmd_bonzomatic = Command::new(path);
+
+    cmd_bonzomatic.current_dir(bonzo_dir).args(v);
+    cmd_bonzomatic.spawn().unwrap()
 }
