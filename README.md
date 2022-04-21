@@ -82,7 +82,26 @@ You can listen via bonzomatic via this command line :
 ```
 .\Bonzomatic_W64_GLFW.exe  skipdialog networkMode=grabber serverURL=ws://drone.alkama.com:9000/livecode/radio
 ```
+## Server
+```
+Start a websocket server
 
+USAGE:
+    bts.exe server [OPTIONS]
+
+OPTIONS:
+        --bind-addr <BIND_ADDR>
+            Host or Host:Port [default: 0.0.0.0:9785]
+
+    -h, --help
+            Print help information
+
+    -s, --save-shader-dir <SAVE_SHADER_DIR>
+            Directory where shaders are saved [default: ./shaders]
+
+        --save-shader-disable
+            Disable shader autosave
+```
 ## Todo :
 
 - Timeline ui to control the replay
