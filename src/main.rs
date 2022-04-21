@@ -172,7 +172,7 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
 fn start_tokio_with_bonzomatic<F: Future>(
     future: F,
     bonzomatic_path: &PathBuf,
-    server_url: &String,
+    bonzomatic_server_url: &String,
     bonzomatic_mode: bonzomatic_launcher::NetworkMode,
 ) -> F::Output {
     let os_string = bonzomatic_path.as_path();
@@ -180,7 +180,7 @@ fn start_tokio_with_bonzomatic<F: Future>(
         &String::from(os_string.as_os_str().to_str().unwrap()),
         true,
         bonzomatic_mode,
-        &server_url,
+        &bonzomatic_server_url,
     );
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()

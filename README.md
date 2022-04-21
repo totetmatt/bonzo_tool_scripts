@@ -4,6 +4,9 @@ Set of tool scripts for bonzomatic
 
 ![alt text](./doc/imgs/main.jpg "Title")
 
+
+Check here some [Tutorials](./TUTORIALS.md)
+
 ## Recorder
 ```
 Record an entry from a websocket entrypoint
