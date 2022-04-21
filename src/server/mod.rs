@@ -122,7 +122,6 @@ async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
                     }
                 }
             }
-
             _ => (),
         }
     }
