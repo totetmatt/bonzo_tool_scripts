@@ -1,4 +1,5 @@
 mod bonzomatic;
+mod bonzomatic_launcher;
 mod radio;
 mod recorder;
 mod replayer;
@@ -6,6 +7,7 @@ mod server;
 mod utils;
 use clap::{Parser, Subcommand};
 use core::future::Future;
+
 use log::info;
 use log::LevelFilter;
 use std::path::PathBuf;
@@ -15,6 +17,7 @@ struct Bts {
     #[clap(subcommand)]
     command: Commands,
 }
+
 #[derive(Subcommand)]
 enum Commands {
     /// Record an entry from a websocket entrypoint
@@ -87,17 +90,74 @@ enum Commands {
         #[clap(long, default_value_t = 10000u64)]
         time_per_entry: u64,
     },
+    /// Start a websocket server
     Server {
         /// Host or Host:Port
-        #[clap(long, default_value_t = String::from("0.0.0.0:8080"))]
+        #[clap(long, default_value_t = String::from("0.0.0.0:9785"))]
         bind_addr: String,
 
+        /// Disable shader autosave
         #[clap(long)]
         save_shader_disable: bool,
 
-        /// Sets a custom config file
+        /// Directory where shaders are saved
         #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
         save_shader_dir: PathBuf,
+    },
+    /// Helper function to record localy
+    BonzoRecord {
+        /// Protocol
+        #[clap( short, long, default_value_t = String::from("ws"))]
+        protocol: String,
+
+        /// Host or Host:Port
+        #[clap( long, default_value_t = String::from("127.0.0.1:9785"))]
+        host: String,
+
+        /// Room
+        #[clap( long, default_value_t = String::from("local_replay"))]
+        room: String,
+
+        /// Handle
+        #[clap( long, default_value_t = String::from("replay"))]
+        handle: String,
+
+        /// Root of Bonzomatic Directory
+        #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
+        bonzomatic_path: PathBuf,
+
+        /// Directory where shaders are saved
+        #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
+        save_shader_dir: PathBuf,
+    },
+    /// Helper function to record localy
+    BonzoReplay {
+        /// Protocol
+        #[clap( short, long, default_value_t = String::from("ws"))]
+        protocol: String,
+
+        /// Host or Host:Port
+        #[clap( long, default_value_t = String::from("127.0.0.1:9785"))]
+        host: String,
+
+        /// Room
+        #[clap( long, default_value_t = String::from("local_replay"))]
+        room: String,
+
+        /// Handles
+        #[clap( long, default_value_t = String::from("replay"))]
+        handle: String,
+
+        /// Input Json file
+        file: String,
+
+        /// udpateInterval (ms)
+        #[clap(long, default_value_t = 300u64)]
+        update_interval: u64,
+
+        /// Root of Bonzomatic Directory
+        #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
+        bonzomatic_path: PathBuf,
     },
 }
 
@@ -109,10 +169,72 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
         .block_on(future)
 }
 
+fn start_tokio_with_bonzomatic<F: Future>(
+    future: F,
+    bonzomatic_path: &PathBuf,
+    bonzomatic_server_url: &String,
+    bonzomatic_mode: bonzomatic_launcher::NetworkMode,
+) -> F::Output {
+    let os_string = bonzomatic_path.as_path();
+    bonzomatic_launcher::bonzomatic_args(
+        &String::from(os_string.as_os_str().to_str().unwrap()),
+        true,
+        bonzomatic_mode,
+        &bonzomatic_server_url,
+    );
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
 fn main() {
     env_logger::builder().filter_level(LevelFilter::Info).init();
     let cli = Bts::parse();
     match &cli.command {
+        Commands::BonzoReplay {
+            protocol,
+            host,
+            room,
+            handle,
+            file,
+            bonzomatic_path,
+            update_interval,
+        } => {
+            info!("Start Local Replayer");
+            let bonzomatic_server_url = utils::get_ws_url(protocol, host, room, handle);
+            start_tokio_with_bonzomatic(
+                async {
+                    let replayer =
+                        replayer::replay(protocol, host, room, handle, file, update_interval);
+                    let path = PathBuf::new();
+                    let server = server::main(host, &true, &path);
+                    tokio::join!(replayer, server)
+                },
+                bonzomatic_path,
+                &bonzomatic_server_url,
+                bonzomatic_launcher::NetworkMode::Grabber,
+            );
+            info!("End Local Replayer")
+        }
+        Commands::BonzoRecord {
+            protocol,
+            host,
+            room,
+            handle,
+            bonzomatic_path,
+            save_shader_dir,
+        } => {
+            info!("Start Local Recorder");
+            let bonzomatic_server_url = utils::get_ws_url(protocol, host, room, handle);
+            start_tokio_with_bonzomatic(
+                server::main(host, &false, save_shader_dir),
+                bonzomatic_path,
+                &bonzomatic_server_url,
+                bonzomatic_launcher::NetworkMode::Sender,
+            );
+            info!("End Local Recorder")
+        }
         Commands::Recorder {
             protocol,
             host,

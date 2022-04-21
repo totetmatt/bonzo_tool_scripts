@@ -13,12 +13,12 @@ use std::{
 };
 use tokio::fs::create_dir_all;
 
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::protocol::Message;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<RwLock<HashMap<SocketAddr, Tx>>>;
@@ -27,7 +27,7 @@ type InstanceMap = Arc<RwLock<HashMap<SocketAddr, Arc<WsBonzoEndpoint>>>>;
 struct FileSaveMessage {
     message: Message,
     meta: Arc<WsBonzoEndpoint>,
-    ts: u128
+    ts: u128,
 }
 
 async fn handle_connection(
@@ -70,11 +70,10 @@ async fn handle_connection(
     let broadcast_incoming = incoming.try_for_each(|msg| {
         match &sender {
             Some(s) => {
-               
                 let send_msg_to_save_queue = s.try_send(FileSaveMessage {
                     message: msg.clone(),
                     meta: Arc::clone(&endpoint),
-                    ts: ts
+                    ts: ts,
                 });
                 tokio::spawn(async { send_msg_to_save_queue });
             }
@@ -123,7 +122,6 @@ async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
                     }
                 }
             }
-
             _ => (),
         }
     }
