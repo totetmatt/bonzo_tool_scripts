@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
-#[warn(dead_code)]
+
 pub enum NetworkMode {
     Sender,
     Grabber,
