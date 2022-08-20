@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WS</title>
+</head>
+<body>
+        <div id="container">
+
+
+        </div>
+    <script>
+            var container=document.getElementById("container");
+            var data = []        // Créer une connexion WebSocket
+            const socket = new WebSocket('ws://localhost:9785/_');
+
+            // La connexion est ouverte
+            socket.addEventListener('open', function (event) {
+
+            });
+
+            // Écouter les messages
+            socket.addEventListener('message', function (event) {
+            console.log('Voici un message du serveur', event.data);
+                        container.innerHTML= "";
+                                  data = JSON.parse(event.data);
+                                 for( const element of data){
+                                                        container.innerHTML+= element.user+"@"+element.room+"<br/>" ;
+                                             }
+            });
+
+    </script>
+</body>
+</html>

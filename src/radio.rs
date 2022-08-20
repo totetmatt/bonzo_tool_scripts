@@ -38,7 +38,7 @@ async fn credited_source(filepath: &str) -> String {
     result_file.push_str(&tail_file);
     result_file.to_owned()
 }
-/// Radio mode 
+/// Radio mode
 pub async fn radio(
     protocol: &str,
     host: &str,
@@ -87,7 +87,7 @@ pub async fn radio(
                         .duration_since(start_time)
                         .expect("Time went backwards");
                     payload.update_shader_time(since_start.as_secs_f64());
-                    let payload=payload.to_message();
+                    let payload = payload.to_message();
                     write.send(payload).await.unwrap();
                     sleep(Duration::from_millis(*update_interval)).await;
                 }
