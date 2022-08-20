@@ -14,3 +14,9 @@ Cargo.lock
 *.pdb
 
 *.json
+
+*.exe
+*.glsl
+*.ttf
+*.dll
+textures/

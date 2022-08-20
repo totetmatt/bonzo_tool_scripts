@@ -1,8 +1,11 @@
 use crate::utils;
-#[derive(Debug, Clone)]
+use serde::Serialize;
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct WsBonzoEndpoint {
     pub room: String,
     pub user: Option<String>,
+    #[serde(skip_serializing)]
+    pub is_info: bool,
 }
 
 impl WsBonzoEndpoint {
@@ -10,15 +13,16 @@ impl WsBonzoEndpoint {
         WsBonzoEndpoint {
             room: String::default(),
             user: None,
+            is_info: false,
         }
     }
     pub fn can_send_to(&self, other: &WsBonzoEndpoint) -> bool {
         other.room == self.room && (other.user == None || other.user == self.user)
     }
 
-    pub fn filename(&self, ts:&u128) -> Result<String, ()> {
+    pub fn filename(&self, ts: &u128) -> Result<String, ()> {
         match &self.user {
-            Some(user) => Ok(utils::get_file_basename(&self.room,user,ts)),
+            Some(user) => Ok(utils::get_file_basename(&self.room, user, ts)),
             _ => Err(()),
         }
     }
@@ -28,13 +32,25 @@ impl WsBonzoEndpoint {
         } else {
             let splited_query = query.split("/").filter(|x| *x != "").collect::<Vec<&str>>();
             match splited_query.len() {
-                1 => Ok(WsBonzoEndpoint {
-                    room: String::from(splited_query[0]),
-                    user: None,
-                }),
+                1 => {
+                    let room_id = splited_query[0];
+                    match room_id.chars().nth(0) {
+                        Some('_') => Ok(WsBonzoEndpoint {
+                            room: String::from(&room_id[1..room_id.len()]),
+                            user: None,
+                            is_info: true,
+                        }),
+                        _ => Ok(WsBonzoEndpoint {
+                            room: String::from(room_id),
+                            user: None,
+                            is_info: false,
+                        }),
+                    }
+                }
                 2 => Ok(WsBonzoEndpoint {
                     room: String::from(splited_query[0]),
                     user: Some(String::from(splited_query[1])),
+                    is_info: false,
                 }),
                 _ => Err(String::from("Path not correct")),
             }
