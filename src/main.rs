@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod bonzomatic;
 mod bonzomatic_launcher;
 mod radio;
@@ -11,6 +13,14 @@ use core::future::Future;
 use log::info;
 use log::LevelFilter;
 use std::path::PathBuf;
+
+#[cfg(unix)]
+pub const BONZOMATIC_EXE: &str = "bonzomatic";
+#[cfg(windows)]
+pub const BONZOMATIC_EXE: &str = "Bonzomatic_W64_GLFW.exe";
+#[cfg(macos)]
+pub const BONZOMATIC_EXE: &str = "Bonzomatic.app";
+
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Bts {
@@ -126,6 +136,10 @@ enum Commands {
         #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
         bonzomatic_path: PathBuf,
 
+        /// Name of Bonzomatic Executable
+        #[clap(short = 'n', long, default_value_t = String::from(BONZOMATIC_EXE))]
+        bonzomatic_name: String,
+
         /// Directory where shaders are saved
         #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
         save_shader_dir: PathBuf,
@@ -158,6 +172,10 @@ enum Commands {
         /// Root of Bonzomatic Directory
         #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
         bonzomatic_path: PathBuf,
+
+        /// Name of Bonzomatic Executable
+        #[clap(short = 'n', long, default_value_t = String::from(BONZOMATIC_EXE))]
+        bonzomatic_name: String,
     },
 }
 
@@ -171,13 +189,14 @@ fn start_tokio<F: Future>(future: F) -> F::Output {
 
 fn start_tokio_with_bonzomatic<F: Future>(
     future: F,
-    bonzomatic_path: &PathBuf,
+    bonzomatic_path: PathBuf,
+    bonzomatic_name: String,
     bonzomatic_server_url: &String,
     bonzomatic_mode: bonzomatic_launcher::NetworkMode,
 ) -> F::Output {
-    let os_string = bonzomatic_path.as_path();
     bonzomatic_launcher::bonzomatic_args(
-        &String::from(os_string.as_os_str().to_str().unwrap()),
+        bonzomatic_path,
+        bonzomatic_name,
         true,
         bonzomatic_mode,
         &bonzomatic_server_url,
@@ -188,10 +207,11 @@ fn start_tokio_with_bonzomatic<F: Future>(
         .unwrap()
         .block_on(future)
 }
+
 fn main() {
     env_logger::builder().filter_level(LevelFilter::Info).init();
     let cli = Bts::parse();
-    match &cli.command {
+    match cli.command {
         Commands::BonzoReplay {
             protocol,
             host,
@@ -199,19 +219,21 @@ fn main() {
             handle,
             file,
             bonzomatic_path,
+            bonzomatic_name,
             update_interval,
         } => {
             info!("Start Local Replayer");
-            let bonzomatic_server_url = utils::get_ws_url(protocol, host, room, handle);
+            let bonzomatic_server_url = utils::get_ws_url(&protocol, &host, &room, &handle);
             start_tokio_with_bonzomatic(
                 async {
                     let replayer =
-                        replayer::replay(protocol, host, room, handle, file, update_interval);
+                        replayer::replay(&protocol, &host, &room, &handle, &file, &update_interval);
                     let path = PathBuf::new();
-                    let server = server::main(host, &true, &path);
+                    let server = server::main(&host, &true, &path);
                     tokio::join!(replayer, server)
                 },
                 bonzomatic_path,
+                bonzomatic_name,
                 &bonzomatic_server_url,
                 bonzomatic_launcher::NetworkMode::Grabber,
             );
@@ -223,13 +245,15 @@ fn main() {
             room,
             handle,
             bonzomatic_path,
+            bonzomatic_name,
             save_shader_dir,
         } => {
             info!("Start Local Recorder");
-            let bonzomatic_server_url = utils::get_ws_url(protocol, host, room, handle);
+            let bonzomatic_server_url = utils::get_ws_url(&protocol, &host, &room, &handle);
             start_tokio_with_bonzomatic(
-                server::main(host, &false, save_shader_dir),
+                server::main(&host, &false, &save_shader_dir),
                 bonzomatic_path,
+                bonzomatic_name,
                 &bonzomatic_server_url,
                 bonzomatic_launcher::NetworkMode::Sender,
             );
@@ -242,7 +266,7 @@ fn main() {
             handle,
         } => {
             info!("Start Recorder");
-            start_tokio(recorder::record(protocol, host, room, handle));
+            start_tokio(recorder::record(&protocol, &host, &room, &handle));
             info!("End Recorder")
         }
         Commands::Replayer {
@@ -255,12 +279,12 @@ fn main() {
         } => {
             info!("{file}");
             start_tokio(replayer::replay(
-                protocol,
-                host,
-                room,
-                handle,
-                file,
-                update_interval,
+                &protocol,
+                &host,
+                &room,
+                &handle,
+                &file,
+                &update_interval,
             ));
             info!("End Replayer")
         }
@@ -275,13 +299,13 @@ fn main() {
         } => {
             info!("Starting Radio");
             start_tokio(radio::radio(
-                protocol,
-                host,
-                room,
-                handle,
-                path,
-                update_interval,
-                time_per_entry,
+                &protocol,
+                &host,
+                &room,
+                &handle,
+                &path,
+                &update_interval,
+                &time_per_entry,
             ));
         }
         Commands::Server {
@@ -289,9 +313,9 @@ fn main() {
             save_shader_disable,
             save_shader_dir,
         } => start_tokio(server::main(
-            bind_addr,
-            save_shader_disable,
-            save_shader_dir,
+            &bind_addr,
+            &save_shader_disable,
+            &save_shader_dir,
         )),
     }
 }
