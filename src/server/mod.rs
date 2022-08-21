@@ -140,7 +140,7 @@ async fn handle_connection(
                     .map(|a| (**a).clone())
                     .filter(|a| endpoint.room == "" || a.room == endpoint.room) // Filter if it matches room or if empty return everything
                     .collect();
-                let m = Message::Text(json!(m).to_string());
+                let m = Message::Text(json!(m).to_string() + "\0"); // Bonzomatic needs \0
                 outgoing.send(m).await.unwrap();
             }
         };
