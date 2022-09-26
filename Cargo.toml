@@ -3,6 +3,13 @@ name = "bts"
 version = "1.4.0"
 edition = "2018"
 
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
+panic = "abort"
+
 [dependencies]
 clap = { version = "*", features = ["derive"] }
 
