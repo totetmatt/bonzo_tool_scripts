@@ -101,7 +101,7 @@ enum Commands {
         save_shader_disable: bool,
 
         /// Directory where shaders are saved
-        #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
+        #[clap(short, long, default_value = "./shaders")]
         save_shader_dir: PathBuf,
     },
     /// Helper function to record localy
@@ -123,11 +123,11 @@ enum Commands {
         handle: String,
 
         /// Root of Bonzomatic Directory
-        #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
+        #[clap(short, long, default_value = r#"./"#)]
         bonzomatic_path: PathBuf,
 
         /// Directory where shaders are saved
-        #[clap(short, long, parse(from_os_str), default_value = "./shaders")]
+        #[clap(short, long, default_value = "./shaders")]
         save_shader_dir: PathBuf,
     },
     /// Helper function to replay localy
@@ -156,7 +156,7 @@ enum Commands {
         update_interval: u64,
 
         /// Root of Bonzomatic Directory
-        #[clap(short, long, parse(from_os_str), default_value = r#"./"#)]
+        #[clap(short, long, default_value = r#"./"#)]
         bonzomatic_path: PathBuf,
     },
 }

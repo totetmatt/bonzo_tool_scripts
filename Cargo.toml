@@ -11,18 +11,18 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-clap = { version = "*", features = ["derive"] }
+clap = { version = "4.1.4", features = ["derive"] }
 
-serde_json = "*"
-serde = { version = "*", features = ["derive"] }
-glob = "*"
-rand = "*"
-uuid = { version = "*", features = ["serde", "v4"] }
+serde_json = "1.0.91"
+serde = { version = "1.0.152", features = ["derive"] }
+glob = "0.3.1"
+rand = "0.8.5"
+uuid = { version = "1.3.0", features = ["serde", "v4"] }
 
-tokio-tungstenite = "*"
-tokio = { version = "*", features = ["full"] }
-futures-util = "*"
-futures-channel = "*"
-tungstenite = {version="*", features=["native-tls"]}
-env_logger = "*"
-log = "*"
+tokio-tungstenite = "0.18.0"
+tokio = { version = "1.25.0", features = ["full"] }
+futures-util = "0.3.26"
+futures-channel = "0.3.26"
+tungstenite = {version="0.18.0", features=["native-tls"]}
+env_logger = "0.10.0"
+log = "0.4.17"
