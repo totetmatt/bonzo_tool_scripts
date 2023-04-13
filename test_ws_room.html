@@ -5,32 +5,84 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WS</title>
+    <style>
+        body {
+            background: #111;
+            color:#EEE;
+            font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif
+        }
+        ul .connected {
+            list-style-type:"🟢";
+        }
+        ul .not-connected {
+            list-style-type:"🔴";
+        }
+        ul li div{
+            margin-left: 10px;
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
-        <div id="container">
-
-
+        <div>
+                <ul id="container"></ul>
         </div>
-    <script>
-            var container=document.getElementById("container");
-            var data = []        // Créer une connexion WebSocket
-            const socket = new WebSocket('ws://localhost:9785/_');
+        <script>
+            var users = {}
+        
+            let container=document.getElementById("container");
+            // Create Websocket
+            const socket = new WebSocket('ws://localhost:9785/roomtest/');
 
-            // La connexion est ouverte
+           // Connexion open
             socket.addEventListener('open', function (event) {
 
             });
 
-            // Écouter les messages
+            // Onmessage
             socket.addEventListener('message', function (event) {
-            console.log('Voici un message du serveur', event.data);
-                        container.innerHTML= "";
-                                  data = JSON.parse(event.data);
-                                 for( const element of data){
-                                                        container.innerHTML+= element.user+"@"+element.room+"<br/>" ;
-                                             }
+                        // Need to remove last \0 from protocol
+                        data = JSON.parse(event.data.slice(0, -1));
+
+                        // Fetch name and shaderTime (relative to sender)
+                        let name = data['Data']['NickName'];
+                        let time = data['Data']['ShaderTime'];
+                        let ts = new Date().getTime();
+                        // If not in the user list, it's first time so we add elements
+                        if(users[name]===undefined) {
+                            let li= document.createElement("li");
+                            let nickNameElement = document.createElement("div");
+                            nickNameElement.innerHTML=name;
+                            let timeElement = document.createElement("div");
+                            timeElement.innerHTML=time;
+                            let onlineElement = document.createElement("div");
+                            li.className='connected';
+                            li.appendChild(onlineElement);
+                            li.appendChild(nickNameElement);
+                            li.appendChild(timeElement);
+                         
+
+                            container.prepend(li);
+                            users[name]={'li':li,'timeElement':timeElement, 'onlineElement':onlineElement, 'update':ts};
+                        } else { // Update timing
+                            users[name].timeElement.innerHTML = time;
+                            users[name].update=ts;
+                        }
+                      
             });
 
-    </script>
+            // Check if existing user is not sending
+            function isOnline() {
+                let ts = new Date().getTime();
+                for (const [key, value] of Object.entries(users)) {
+                    if(ts - value.update >= 1000 ) {
+                        value.li.className='not-connected';
+                    } else {
+                       value.li.className='connected';
+                    }
+                }
+            }
+            setInterval(isOnline,500);
+        </script>
 </body>
 </html>
