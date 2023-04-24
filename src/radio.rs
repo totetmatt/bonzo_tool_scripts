@@ -78,7 +78,7 @@ pub async fn radio(
                     source,
                     true,
                     0,
-                    String::from("radio"),
+                    String::from(handle),
                     String::from(room),
                     0f64,
                 );
