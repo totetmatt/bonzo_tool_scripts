@@ -38,7 +38,7 @@ async fn handle_connection(
     raw_stream: TcpStream,
     addr: SocketAddr,
     sender: Option<Sender<FileSaveMessage>>,
-) {
+) -> Result<(), tungstenite::Error> {
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -55,8 +55,7 @@ async fn handle_connection(
     };
 
     let ws_stream = tokio_tungstenite::accept_hdr_async(raw_stream, callback)
-        .await
-        .expect("Error during the websocket handshake occurred");
+        .await?;
     info!("WebSocket connection established: {addr}");
     info!("{endpoint:?}");
     info!("{}", endpoint.room);
@@ -158,6 +157,7 @@ async fn handle_connection(
             _ => None,
         };
     }
+    Ok(())
 }
 
 async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
