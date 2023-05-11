@@ -160,7 +160,12 @@ async fn handle_connection(
     }
 }
 
-async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
+async fn save_message(
+    mut crx: Receiver<FileSaveMessage>,
+    save_glsl: bool,
+    save_history: bool,
+    dir_path: PathBuf,
+) {
     while let Some(message) = crx.recv().await {
         match message.message {
             Message::Ping(_) => debug!("Ping"),
@@ -169,7 +174,9 @@ async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
                     bonzomatic::Payload::from_message(&message.message);
                 match message.meta.filename(&message.ts) {
                     Ok(filename) => {
-                        payload.save(&dir_path, &filename).await;
+                        payload
+                            .save(save_glsl, save_history, &dir_path, &filename)
+                            .await;
                     }
                     Err(_) => {
                         warn!("Error, not valid entrypoint for saving to file");
@@ -181,7 +188,12 @@ async fn save_message(mut crx: Receiver<FileSaveMessage>, dir_path: PathBuf) {
     }
 }
 
-pub async fn main(addr: &String, save_shader_disable: &bool, save_shader_dir: &PathBuf) -> () {
+pub async fn main(
+    addr: &String,
+    save_glsl: bool,
+    save_history: bool,
+    save_shader_dir: &PathBuf,
+) -> () {
     let state = PeerMap::new(RwLock::new(HashMap::new()));
     let instances = InstanceMap::new(RwLock::new(HashMap::new()));
     let endpoint_lock = EndpointLockMap::new(RwLock::new(HashMap::new()));
@@ -189,11 +201,18 @@ pub async fn main(addr: &String, save_shader_disable: &bool, save_shader_dir: &P
     let try_socket = TcpListener::bind(addr.to_owned()).await;
     let listener = try_socket.expect("Failed to bind");
     info!("Listening on: {}", addr);
-    let sender = if !save_shader_disable {
+
+    let sender = if save_glsl || save_history {
+        info!("save_glsl: {}, save_history: {}", save_glsl, save_history);
         let (ctx, crx) = mpsc::channel::<FileSaveMessage>(256);
         info!("Save shaders in {}", save_shader_dir.display());
         create_dir_all(save_shader_dir).await.unwrap();
-        tokio::spawn(save_message(crx, save_shader_dir.to_owned()));
+        tokio::spawn(save_message(
+            crx,
+            save_glsl,
+            save_history,
+            save_shader_dir.to_owned(),
+        ));
         Some(ctx)
     } else {
         info!("Not saving shaders");
