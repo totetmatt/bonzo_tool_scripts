@@ -104,6 +104,10 @@ enum Commands {
         #[clap(long, default_value_t = false)]
         save_history: bool,
 
+        /// if save shader history activated, only save when compile
+        #[clap(long, default_value_t = false)]
+        only_compile: bool,
+
         /// Directory where shaders are saved
         #[clap(short, long, default_value = "./shaders")]
         save_shader_dir: PathBuf,
@@ -212,7 +216,7 @@ fn main() {
                     let replayer =
                         replayer::replay(protocol, host, room, handle, file, update_interval);
                     let path = PathBuf::new();
-                    let server = server::main(host, true, true, &path);
+                    let server = server::main(host, true, true, false, &path);
                     tokio::join!(replayer, server)
                 },
                 bonzomatic_path,
@@ -232,7 +236,7 @@ fn main() {
             info!("Start Local Recorder");
             let bonzomatic_server_url = utils::get_ws_url(protocol, host, room, handle);
             start_tokio_with_bonzomatic(
-                server::main(host, false, false, save_shader_dir),
+                server::main(host, false, false, false, save_shader_dir),
                 bonzomatic_path,
                 &bonzomatic_server_url,
                 bonzomatic_launcher::NetworkMode::Sender,
@@ -292,11 +296,13 @@ fn main() {
             bind_addr,
             save_glsl,
             save_history,
+            only_compile,
             save_shader_dir,
         } => start_tokio(server::main(
             bind_addr,
             *save_glsl,
             *save_history,
+            *only_compile,
             save_shader_dir,
         )),
     }

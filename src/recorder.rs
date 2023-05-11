@@ -33,7 +33,7 @@ pub async fn record(protocol: &str, host: &str, room: &str, handle: &str) {
                     Message::Text(_) => {
                         let payload: bonzomatic::Payload = bonzomatic::Payload::from_message(&data);
                         payload
-                            .save(false, true, &PathBuf::from("./"), &basename_id)
+                            .save(false, true, false, &PathBuf::from("./"), &basename_id)
                             .await;
                     }
                     _ => (),

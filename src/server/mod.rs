@@ -164,6 +164,7 @@ async fn save_message(
     mut crx: Receiver<FileSaveMessage>,
     save_glsl: bool,
     save_history: bool,
+    only_compile: bool,
     dir_path: PathBuf,
 ) {
     while let Some(message) = crx.recv().await {
@@ -175,7 +176,7 @@ async fn save_message(
                 match message.meta.filename(&message.ts) {
                     Ok(filename) => {
                         payload
-                            .save(save_glsl, save_history, &dir_path, &filename)
+                            .save(save_glsl, save_history, only_compile, &dir_path, &filename)
                             .await;
                     }
                     Err(_) => {
@@ -192,6 +193,7 @@ pub async fn main(
     addr: &String,
     save_glsl: bool,
     save_history: bool,
+    only_compile: bool,
     save_shader_dir: &PathBuf,
 ) -> () {
     let state = PeerMap::new(RwLock::new(HashMap::new()));
@@ -211,6 +213,7 @@ pub async fn main(
             crx,
             save_glsl,
             save_history,
+            only_compile,
             save_shader_dir.to_owned(),
         ));
         Some(ctx)
