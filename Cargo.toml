@@ -26,3 +26,14 @@ futures-channel = "0.3.26"
 tungstenite = {version="0.18.0", features=["native-tls"]}
 env_logger = "0.10.0"
 log = "0.4.17"
+ratatui = { version = "0.26.1", features = ["all-widgets"] }
+crossterm = "0.27.0"
+
+[[bin]]
+name = "activity"
+path = "src/activity.rs"
+
+[[bin]]
+name = "bts"
+path = "src/main.rs"
+

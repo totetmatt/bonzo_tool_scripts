@@ -54,8 +54,7 @@ async fn handle_connection(
         Ok(response)
     };
 
-    let ws_stream = tokio_tungstenite::accept_hdr_async(raw_stream, callback)
-        .await?;
+    let ws_stream = tokio_tungstenite::accept_hdr_async(raw_stream, callback).await?;
     info!("WebSocket connection established: {addr}");
     info!("{endpoint:?}");
     info!("{}", endpoint.room);

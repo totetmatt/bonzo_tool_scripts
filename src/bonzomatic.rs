@@ -29,6 +29,27 @@ pub struct Payload {
     data: Data,
 }
 impl Payload {
+    pub fn get_shader_time(&self) -> f64 {
+        self.data.shader_time
+    }
+    pub fn get_caret(&self) -> u32 {
+        self.data.caret
+    }
+    pub fn get_anchor(&self) -> u32 {
+        self.data.anchor
+    }
+    pub fn get_compile(&self) -> bool {
+        self.data.compile
+    }
+    pub fn get_code(&self) -> &String {
+        &self.data.code
+    }
+    pub fn get_visible_line(&self) -> u32 {
+        self.data.first_visible_line
+    }
+    pub fn get_nickname(&self) -> &String {
+        &self.data.nickname
+    }
     pub fn update_shader_time(&mut self, shader_time: f64) {
         self.data.shader_time = shader_time;
     }
