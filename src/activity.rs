@@ -136,8 +136,12 @@ async fn interface(
             .values()
             .map(|p| p.clone())
             .collect::<Vec<RefCell<Participant>>>();
-        participants_list
-            .sort_by_key(|a| (a.borrow().is_offline(), a.borrow().handle.to_lowercase().to_string()));
+        participants_list.sort_by_key(|a| {
+            (
+                a.borrow().is_offline(),
+                a.borrow().handle.to_lowercase().to_string(),
+            )
+        });
         let rows = participants_list
             .iter()
             .map(|p| {
@@ -170,8 +174,8 @@ async fn interface(
                 .position(|a| a.borrow().handle.eq(handle)),
             None => None,
         };
- 
-        let (code,line)= match selected_handle {
+
+        let (code, line) = match selected_handle {
             Some(ref handle) => {
                 let p = participants_mutex.get(handle).unwrap().borrow();
                 let anchor = p.anchor as usize;
@@ -179,7 +183,7 @@ async fn interface(
                 let (first, last, diff) = if anchor > caret {
                     (caret, anchor, anchor - caret)
                 } else {
-                    (anchor,caret,  caret - anchor)
+                    (anchor, caret, caret - anchor)
                 };
                 let mut final_string_vec: Vec<Line> = Vec::new();
                 let mut total: usize = 0;
@@ -195,14 +199,26 @@ async fn interface(
                     if start_line <= first && first <= end_line {
                         let (left, right) = line.split_at(first - start_line);
                         v.push(Span::styled(left.to_string(), Style::default()));
-                        v.push(Span::styled("▙".to_string(), Style::default().fg(Color::Red)));
-                        v.push(Span::styled(right.to_string(), Style::default().fg(Color::Yellow)));
-                        is_view=true;
+                        v.push(Span::styled(
+                            "▙".to_string(),
+                            Style::default().fg(Color::Red),
+                        ));
+                        v.push(Span::styled(
+                            right.to_string(),
+                            Style::default().fg(Color::Yellow),
+                        ));
+                        is_view = true;
                     } else {
-                     
-                        v.push(Span::styled(line.to_string(), if is_view {Style::default().fg(Color::Yellow)} else {Style::default()}));
+                        v.push(Span::styled(
+                            line.to_string(),
+                            if is_view {
+                                Style::default().fg(Color::Yellow)
+                            } else {
+                                Style::default()
+                            },
+                        ));
                     };
-                    if (start_line <= last && last <= end_line ) {
+                    if (start_line <= last && last <= end_line) {
                         let split_idx = if v.len() != 1 {
                             diff
                         } else {
@@ -210,20 +226,26 @@ async fn interface(
                         };
                         let tmp = v.pop().unwrap();
                         let (left, right) = tmp.content.split_at(split_idx);
-                        v.push(Span::styled(left.to_string(), Style::default().fg(Color::Yellow)));
-                        v.push(Span::styled("▜".to_string(), Style::default().fg(Color::Red)));
+                        v.push(Span::styled(
+                            left.to_string(),
+                            Style::default().fg(Color::Yellow),
+                        ));
+                        v.push(Span::styled(
+                            "▜".to_string(),
+                            Style::default().fg(Color::Red),
+                        ));
                         v.push(Span::styled(right.to_string(), Style::default()));
-                        is_view=false;
+                        is_view = false;
                     }
                     final_string_vec.push(Line::from(v));
                     total += size + 1;
                 }
-             
-                (final_string_vec,p.first_line)
+
+                (final_string_vec, p.first_line)
             }
-            None =>( Vec::new(),0),
+            None => (Vec::new(), 0),
         };
-    
+
         let text = Text::from(code);
         terminal.draw(|frame| {
             let main_layout = Layout::new(
@@ -267,8 +289,9 @@ async fn interface(
 
             let p = Paragraph::new(text)
                 .block(block)
-                .style(Style::new().white().on_black())       .scroll((line as u16, 0));;
-     
+                .style(Style::new().white().on_black())
+                .scroll((line as u16, 0));
+
             frame.render_widget(p, main_layout[1]);
         })?;
 

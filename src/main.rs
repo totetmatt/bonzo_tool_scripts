@@ -1,5 +1,6 @@
 mod bonzomatic;
 mod bonzomatic_launcher;
+mod bridge;
 mod radio;
 mod recorder;
 mod replayer;
@@ -167,6 +168,28 @@ enum Commands {
         #[clap(short, long, default_value = r#"./"#)]
         bonzomatic_path: PathBuf,
     },
+
+    /// Helper function to rerout from one room to another
+    Bridge {
+        /// Protocol
+        #[clap( short, long, default_value_t = String::from("ws"))]
+        protocol: String,
+
+        /// Host or Host:Port
+        #[clap( long, default_value_t = String::from("127.0.0.1:9785"))]
+        host: String,
+
+        /// From Room
+        #[clap( long, default_value_t = String::from("from_room"))]
+        from_room: String,
+        /// To Room
+        #[clap( long, default_value_t = String::from("to_room"))]
+        to_room: String,
+
+        /// Handles
+        #[clap( long, default_value_t = String::from("replay"))]
+        handle: String,
+    },
 }
 
 fn start_tokio<F: Future>(future: F) -> F::Output {
@@ -305,5 +328,12 @@ fn main() {
             *only_compile,
             save_shader_dir,
         )),
+        Commands::Bridge {
+            protocol,
+            host,
+            from_room,
+            to_room,
+            handle,
+        } => start_tokio(bridge::bridge(protocol, host, from_room, to_room, handle)),
     }
 }
